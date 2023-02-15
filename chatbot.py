@@ -2,6 +2,10 @@ import os
 import openai
 from io import StringIO
 
+from dotenv import load_dotenv, find_dotenv
+load_dotenv()
+
+
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 openai.organization = os.getenv("OPENAI_ORG")

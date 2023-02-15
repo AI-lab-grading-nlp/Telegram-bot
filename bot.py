@@ -3,6 +3,13 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import os
 
+from dotenv import load_dotenv, find_dotenv
+load_dotenv()
+
+
+
+
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
