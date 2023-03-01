@@ -8,7 +8,7 @@ poll/quiz the bot generates. The preview command generates a closed poll/quiz, e
 one the user sends the bot
 """
 import logging
-
+from themes import create_clusters
 from telegram import __version__ as TG_VER
 import os
 from chatbot import get_response
@@ -72,6 +72,9 @@ async def poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a predefined poll"""
     #questions means themes
     source = context.bot_data.get('source')
+    #potential command:
+    #df = pd.DataFrame(source, sep=' ', header=None)
+    #suggested_themes = create_clusters(df)[1]
     suggested_themes = source.split()[1:5]
     questions = suggested_themes
 

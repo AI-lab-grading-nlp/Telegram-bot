@@ -1,4 +1,3 @@
-from pollbot import source
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import string
@@ -16,7 +15,7 @@ nltk.download('punkt')
 pd.set_option('display.max_colwidth', 100)
 
 
-df = pd.read_csv(source, sep='.')  # add data here
+#df = pd.read_csv(source, sep='.')  # add data here
 
 stopwords.words('english')
 
@@ -77,14 +76,6 @@ def vectorize_tfidf(df):
     return (X, vec)
 
 
-df['cleaned'] = df['corpus'].apply(
-    lambda x: clean_data(x, remove_stopwords=True))
-X, vec = vectorize_tfidf(df['cleaned'])
-
-kmeans = KMeans(n_clusters=5, random_state=0).fit(X)
-df['cluster'] = kmeans.labels_
-
-
 def get_top_words_per_cluster(df, vec, n_words):
     """
     Gets the top n words per cluster.
@@ -107,4 +98,23 @@ def get_top_words_per_cluster(df, vec, n_words):
     return top_words
 
 
-top_words = get_top_words_per_cluster(df, vec, 3)
+def create_clusters(df, clusters):
+    """
+    Creates clusters using the KMeans algorithm.
+
+    Args:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+
+    Returns:
+        df (pd.DataFrame): A pandas DataFrame containing the text data and cluster labels.
+    """
+    df.rename(columns={0: 'corpus'}, inplace=True)
+    df['cleaned'] = df['corpus'].apply(
+        lambda x: clean_data(x, remove_stopwords=True))
+    X, vec = vectorize_tfidf(df['cleaned'])
+    kmeans = KMeans(n_clusters=clusters, random_state=0).fit(X)
+    df['cluster'] = kmeans.labels_
+    top_words = get_top_words_per_cluster(df, vec, 3)
+    return df, top_words
+
+
