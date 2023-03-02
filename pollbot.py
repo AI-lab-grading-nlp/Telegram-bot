@@ -7,6 +7,24 @@ Basic example for a bot that works with polls. Only 3 people are allowed to inte
 poll/quiz the bot generates. The preview command generates a closed poll/quiz, exactly like the
 one the user sends the bot
 """
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    PollAnswerHandler,
+    PollHandler,
+    filters,
+)
+from telegram.constants import ParseMode
+from telegram import (
+    KeyboardButton,
+    KeyboardButtonPollType,
+    Poll,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    Update,
+)
 import logging
 
 from telegram import __version__ as TG_VER
@@ -29,24 +47,6 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import (
-    KeyboardButton,
-    KeyboardButtonPollType,
-    Poll,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-    Update,
-)
-from telegram.constants import ParseMode
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    PollAnswerHandler,
-    PollHandler,
-    filters,
-)
 
 # Enable logging
 logging.basicConfig(
@@ -62,15 +62,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         " to generate a quiz from the source text."
     )
 
+
 async def source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     """Save the source text"""
+
     context.bot_data["source"] = update.message.text
     await update.message.reply_text("Source text saved!")
 
+
 async def poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends a predefined poll"""
-    #questions means themes
+    # questions means themes
     source = context.bot_data.get('source')
     suggested_themes = source.split()[1:5]
     questions = suggested_themes
@@ -122,6 +125,7 @@ async def receive_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.bot_data['themes'] = answer_string.split(' and ')
     print(context.bot_data['themes'])
 
+
 async def user_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Save the themes the user wants to be quizzed on in addition to the ones selected"""
 
@@ -135,13 +139,11 @@ async def user_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await context.bot.send_message(update.effective_chat.id, "Themes saved!")
 
 
-
 async def quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     """Sends a quiz using the source text"""
 
     source = context.bot_data.get("source")
-
 
     prompt = "Bob is a chatbot that gives a multiple choice quiz based on a source text with 4 options labeled from 1 to 4 alongside an explanation for the correct answer in the following format: \n\n Question \n\n 1. option 1 \n 2. option 2 \n 3. option 3 \n 4. option 4  \n\n explanation: ... \n\n The correct answer is labeled with a * \n\n Question \n\n 1. option 1 \n 2. option 2 \n 3. option 3 \n 4. option 4 * \n\n explanation: The correct answer is option 4 because ... . The options are kept less than 100 characters. \n\n The source text is: \n\n"
 
@@ -221,11 +223,13 @@ async def receive_quiz_answer(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def preview(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Ask user to create a poll and display a preview of it"""
     # using this without a type lets the user chooses what he wants (quiz or poll)
-    button = [[KeyboardButton("Press me!", request_poll=KeyboardButtonPollType())]]
+    button = [
+        [KeyboardButton("Press me!", request_poll=KeyboardButtonPollType())]]
     message = "Press the button to let the bot generate a preview for your poll"
     # using one_time_keyboard to hide the keyboard
     await update.effective_message.reply_text(
-        message, reply_markup=ReplyKeyboardMarkup(button, one_time_keyboard=True)
+        message, reply_markup=ReplyKeyboardMarkup(
+            button, one_time_keyboard=True)
     )
 
 
