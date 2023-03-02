@@ -1,4 +1,3 @@
-from pollbot import source
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import string
@@ -16,9 +15,11 @@ nltk.download('punkt')
 pd.set_option('display.max_colwidth', 100)
 
 
-df = pd.read_csv(source, sep='.')  # add data here
+#df = pd.read_csv(source, sep='.')  # add data here
 
 stopwords.words('english')
+
+
 
 
 def clean_data(text: str, remove_stopwords: bool = True) -> str:
@@ -67,7 +68,8 @@ def vectorize_tfidf(df):
         vec (TfidfVectorizer): The fitted TfidfVectorizer object.
     """
     vec = TfidfVectorizer(sublinear_tf=True, analyzer='word',
-                          norm='l2', min_df=5, max_df=0.95)
+                          norm='l2', max_df=0.95)
+
     X_vec = vec.fit_transform(df)  # fitting and transforming the data
 
     scaler = StandardScaler(with_mean=False)  # scaling the data
@@ -77,15 +79,7 @@ def vectorize_tfidf(df):
     return (X, vec)
 
 
-df['cleaned'] = df['corpus'].apply(
-    lambda x: clean_data(x, remove_stopwords=True))
-X, vec = vectorize_tfidf(df['cleaned'])
-
-kmeans = KMeans(n_clusters=5, random_state=0).fit(X)
-df['cluster'] = kmeans.labels_
-
-
-def get_top_words_per_cluster(df, vec, n_words):
+def get_top_words_per_cluster(df, vec, n_words, kmeans):
     """
     Gets the top n words per cluster.
 
@@ -101,10 +95,80 @@ def get_top_words_per_cluster(df, vec, n_words):
     for cluster in range(0, 5):
         top_words[cluster] = []
         indices = np.argsort(kmeans.cluster_centers_[cluster])[::-1]
-        features = vec.get_feature_names()
+        features = vec.get_feature_names_out()
         for i in indices[:n_words]:
             top_words[cluster].append(features[i])
     return top_words
 
 
-top_words = get_top_words_per_cluster(df, vec, 3)
+
+def create_clusters(df, clusters: int = 5):
+    """
+    Creates clusters using the KMeans algorithm.
+
+    Args:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+
+    Returns:
+        df (pd.DataFrame): A pandas DataFrame containing the text data and cluster labels.
+    """
+    df.rename(columns={0: 'corpus'}, inplace=True)
+    df['cleaned'] = df['corpus'].apply(
+        lambda x: clean_data(x, remove_stopwords=True))
+    X, vec = vectorize_tfidf(df['cleaned'])
+    kmeans = KMeans(n_clusters=clusters, n_init="auto", random_state=0).fit(X)
+    df['cluster'] = kmeans.labels_
+    top_words = get_top_words_per_cluster(df, vec, 3, kmeans)
+    return df, top_words
+
+
+
+def text_to_df(text: str) -> pd.DataFrame:
+    """
+    Converts a string of text into a pandas DataFrame.
+
+    Args:
+        text (str): A string of text to be converted into a DataFrame.
+
+    Returns:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+    """
+    # make a dataframe with 0 as a column name, splitting text into rows of 5 words and corresponding punctuation each
+    df = pd.DataFrame(text.split('.'), columns=[0])
+    return df
+
+def unify_top_words(top_words):
+    # create a list of all the top words, removing duplicates
+    top_words_list = []
+    for cluster in top_words:
+        for word in top_words[cluster]:
+            top_words_list.append(word)
+    top_words_list = list(set(top_words_list))
+    return top_words_list
+
+
+def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
+    """
+    Creates clusters using the KMeans algorithm.
+
+    Args:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+
+    Returns:
+        top_words_list (list): A list of the top words for all clusters to be used in themes.
+    """
+    df = text_to_df(text)
+    df, top_words = create_clusters(df, clusters=clusters)
+    top_words_list = unify_top_words(top_words)
+    min_length = min(len(top_words_list), 10)
+    return top_words_list[:min_length]
+
+text = """
+/source Principal Components Analysis (PCA) is a well-known unsupervised dimensionality reduction technique that constructs relevant features/variables through linear (linear PCA) or non-linear (kernel PCA) combinations of the original variables (features). In this post, we will only focus on the famous and widely used linear PCA method.
+
+The construction of relevant features is achieved by linearly transforming correlated variables into a smaller number of uncorrelated variables. This is done by projecting (dot product) the original data into the reduced PCA space using the eigenvectors of the covariance/correlation matrix aka the principal components (PCs).
+
+The resulting projected data are essentially linear combinations of the original data capturing most of the variance in the data (Jolliffe 2002).
+
+In summary, PCA is an orthogonal transformation of the data into a series of uncorrelated data living in the reduced PCA space such that the first component explains the most variance in the data with each subsequent component explaining less.
+"""
