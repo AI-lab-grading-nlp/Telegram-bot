@@ -68,7 +68,7 @@ def vectorize_tfidf(df):
         vec (TfidfVectorizer): The fitted TfidfVectorizer object.
     """
     vec = TfidfVectorizer(sublinear_tf=True, analyzer='word',
-                          norm='l2', min_df=5, max_df=0.95)
+                          norm='l2', max_df=0.95)
 
     X_vec = vec.fit_transform(df)  # fitting and transforming the data
 
@@ -116,7 +116,7 @@ def create_clusters(df, clusters: int = 5):
     df['cleaned'] = df['corpus'].apply(
         lambda x: clean_data(x, remove_stopwords=True))
     X, vec = vectorize_tfidf(df['cleaned'])
-    kmeans = KMeans(n_clusters=clusters, random_state=0).fit(X)
+    kmeans = KMeans(n_clusters=clusters, n_init="auto", random_state=0).fit(X)
     df['cluster'] = kmeans.labels_
     top_words = get_top_words_per_cluster(df, vec, 3, kmeans)
     return df, top_words
@@ -160,4 +160,15 @@ def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
     df = text_to_df(text)
     df, top_words = create_clusters(df, clusters=clusters)
     top_words_list = unify_top_words(top_words)
-    return top_words_list
+    min_length = min(len(top_words_list), 11)
+    return top_words_list[:10]
+
+text = """
+/source Principal Components Analysis (PCA) is a well-known unsupervised dimensionality reduction technique that constructs relevant features/variables through linear (linear PCA) or non-linear (kernel PCA) combinations of the original variables (features). In this post, we will only focus on the famous and widely used linear PCA method.
+
+The construction of relevant features is achieved by linearly transforming correlated variables into a smaller number of uncorrelated variables. This is done by projecting (dot product) the original data into the reduced PCA space using the eigenvectors of the covariance/correlation matrix aka the principal components (PCs).
+
+The resulting projected data are essentially linear combinations of the original data capturing most of the variance in the data (Jolliffe 2002).
+
+In summary, PCA is an orthogonal transformation of the data into a series of uncorrelated data living in the reduced PCA space such that the first component explains the most variance in the data with each subsequent component explaining less.
+"""
