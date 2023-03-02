@@ -160,8 +160,8 @@ def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
     df = text_to_df(text)
     df, top_words = create_clusters(df, clusters=clusters)
     top_words_list = unify_top_words(top_words)
-    min_length = min(len(top_words_list), 11)
-    return top_words_list[:10]
+    min_length = min(len(top_words_list), 10)
+    return top_words_list[:min_length]
 
 text = """
 /source Principal Components Analysis (PCA) is a well-known unsupervised dimensionality reduction technique that constructs relevant features/variables through linear (linear PCA) or non-linear (kernel PCA) combinations of the original variables (features). In this post, we will only focus on the famous and widely used linear PCA method.
