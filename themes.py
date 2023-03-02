@@ -20,6 +20,8 @@ pd.set_option('display.max_colwidth', 100)
 stopwords.words('english')
 
 
+
+
 def clean_data(text: str, remove_stopwords: bool = True) -> str:
     """
     Preprocesses a given string of text by removing special characters, multiple space characters, and optionally, stopwords.
@@ -67,6 +69,7 @@ def vectorize_tfidf(df):
     """
     vec = TfidfVectorizer(sublinear_tf=True, analyzer='word',
                           norm='l2', min_df=5, max_df=0.95)
+
     X_vec = vec.fit_transform(df)  # fitting and transforming the data
 
     scaler = StandardScaler(with_mean=False)  # scaling the data
@@ -76,7 +79,7 @@ def vectorize_tfidf(df):
     return (X, vec)
 
 
-def get_top_words_per_cluster(df, vec, n_words):
+def get_top_words_per_cluster(df, vec, n_words, kmeans):
     """
     Gets the top n words per cluster.
 
@@ -92,13 +95,14 @@ def get_top_words_per_cluster(df, vec, n_words):
     for cluster in range(0, 5):
         top_words[cluster] = []
         indices = np.argsort(kmeans.cluster_centers_[cluster])[::-1]
-        features = vec.get_feature_names()
+        features = vec.get_feature_names_out()
         for i in indices[:n_words]:
             top_words[cluster].append(features[i])
     return top_words
 
 
-def create_clusters(df, clusters):
+
+def create_clusters(df, clusters: int = 5):
     """
     Creates clusters using the KMeans algorithm.
 
@@ -114,7 +118,46 @@ def create_clusters(df, clusters):
     X, vec = vectorize_tfidf(df['cleaned'])
     kmeans = KMeans(n_clusters=clusters, random_state=0).fit(X)
     df['cluster'] = kmeans.labels_
-    top_words = get_top_words_per_cluster(df, vec, 3)
+    top_words = get_top_words_per_cluster(df, vec, 3, kmeans)
     return df, top_words
 
 
+
+def text_to_df(text: str) -> pd.DataFrame:
+    """
+    Converts a string of text into a pandas DataFrame.
+
+    Args:
+        text (str): A string of text to be converted into a DataFrame.
+
+    Returns:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+    """
+    # make a dataframe with 0 as a column name, splitting text into rows of 5 words and corresponding punctuation each
+    df = pd.DataFrame(text.split('.'), columns=[0])
+    return df
+
+def unify_top_words(top_words):
+    # create a list of all the top words, removing duplicates
+    top_words_list = []
+    for cluster in top_words:
+        for word in top_words[cluster]:
+            top_words_list.append(word)
+    top_words_list = list(set(top_words_list))
+    return top_words_list
+
+
+def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
+    """
+    Creates clusters using the KMeans algorithm.
+
+    Args:
+        df (pd.DataFrame): A pandas DataFrame containing the text data.
+
+    Returns:
+        top_words_list (list): A list of the top words for all clusters to be used in themes.
+    """
+    df = text_to_df(text)
+    df, top_words = create_clusters(df, clusters=clusters)
+    top_words_list = unify_top_words(top_words)
+    return top_words_list

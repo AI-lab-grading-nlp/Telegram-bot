@@ -54,6 +54,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from themes import themes_pipeline
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Inform user about what this bot can do"""
@@ -75,7 +76,7 @@ async def poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     #potential command:
     #df = pd.DataFrame(source, sep=' ', header=None)
     #suggested_themes = create_clusters(df)[1]
-    suggested_themes = source.split()[1:5]
+    suggested_themes = themes_pipeline(source, 5)
     questions = suggested_themes
 
     message = await context.bot.send_poll(
