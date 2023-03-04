@@ -32,7 +32,8 @@ if __version_info__ < (20, 0, 0, "alpha", 1):
         f"{TG_VER} version of this example, "
         f"visit https://docs.python-telegram-bot.org/en/v{TG_VER}/examples.html"
     )
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, Poll
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -41,7 +42,15 @@ from telegram.ext import (
     ConversationHandler,
     MessageHandler,
     filters,
+    PollAnswerHandler,
+    PollHandler
 )
+
+from themes import themes_pipeline
+from chatbot import get_response
+from dotenv import load_dotenv
+import random
+
 
 # Enable logging
 logging.basicConfig(
@@ -74,7 +83,8 @@ END = ConversationHandler.END
     SOURCE,
     THEMES,
     QUIZ,
-) = map(chr, range(10, 14))
+    GOING_TO_MANUAL_THEMES
+) = map(chr, range(12, 17))
 
 
 # Top level conversation callbacks
@@ -100,7 +110,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     ]
     keyboard = InlineKeyboardMarkup(buttons)
 
-    if update.message:
+    if update.callback_query is None and update.message is None:
+        await context.bot.send_message(text=text, reply_markup=keyboard, chat_id=context.user_data['chat_id'])
+    elif update.callback_query is None:
         # If we're starting over we don't need to send a new message
         if context.user_data.get(START_OVER):
             await update.message.reply_text(text=text, reply_markup=keyboard)
@@ -113,7 +125,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(
             text=text, reply_markup=keyboard)
-
     context.user_data[START_OVER] = False
     return SELECTING_ACTION
 
@@ -131,6 +142,7 @@ async def selecting_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def saving_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Save the source to user_data'''
 
+    context.user_data['chat_id'] = update.message.chat_id
     if update.message is not None:
         source = update.message.text
     else:
@@ -152,7 +164,7 @@ async def selecting_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             InlineKeyboardButton(
                 text="Autogenerate", callback_data=str(AUTOGENERATING_THEMES)),
             InlineKeyboardButton(
-                text="Manually Input", callback_data=str(MANUAL_THEME_ENTRY)),
+                text="Manually Input", callback_data=str(GOING_TO_MANUAL_THEMES)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -165,25 +177,99 @@ async def selecting_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def auto_generating_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Auto generate themes from the source'''
+
+    source = context.user_data[SOURCE]
+    suggested_themes = themes_pipeline(source, 5)
+
+    message = await context.bot.send_poll(
+        update.effective_chat.id,
+        "Select the themes you want to study",
+        suggested_themes,
+        is_anonymous=False,
+        allows_multiple_answers=True
+    )
+
+    # Save some info about the poll the user_data for later use in receive_poll_answer
+
+    payload = {
+        message.poll.id: {
+            "questions": suggested_themes,
+            "message_id": message.message_id,
+            "chat_id": message.chat.id,
+            "user_data": context.user_data,
+            "answers": 0,
+        }
+    }
+
+    context.user_data.update(payload)
+
+    return SELECTING_THEMES
+
+
+async def receive_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Summarize a users poll vote"""
+    answer = update.poll_answer
+    answered_poll = context.user_data[answer.poll_id]
+    try:
+        questions = answered_poll["questions"]
+    # this means this poll answer update is from an old poll, we can't do our answering then
+    except KeyError:
+        return
+    selected_options = answer.option_ids
+    answer_string = ""
+    for question_id in selected_options:
+        if question_id != selected_options[-1]:
+            answer_string += questions[question_id] + " and "
+        else:
+            answer_string += questions[question_id]
+    await context.bot.send_message(
+        answered_poll["chat_id"],
+        f"{update.effective_user.mention_html()} wants to be quizzed on {answer_string}!",
+        parse_mode=ParseMode.HTML,
+    )
+    context.user_data['themes'] = answer_string
+
+    answered_poll["answers"] += 1
+
+    context.user_data['themes'] = answer_string.split(' and ')
+
     return await start(update, context)
+
+
+async def go_to_manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+    '''Go to the manual theme entry state'''
+
+    text = "Type in the themes you want to study, separated by commas. \n Example: 'Python, Telegram, Bot'"
+
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(text=text)
+
+    return MANUAL_THEME_ENTRY
 
 
 async def manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Manually input themes'''
+
+    user_themes_string = update.message.text
+
+    # add the themes to the themes list
+    context.bot_data['user_themes'] = user_themes_string.split(
+        ',')
+    context.user_data[START_OVER] = True
+    await context.bot.send_message(update.effective_chat.id, "Themes saved!")
+
     return await start(update, context)
 
 
 async def selecting_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Select the quiz to be made'''
 
-    text = "Type in the themes you want to study, separated by commas. \n Example: 'Python, Telegram, Bot'"
+    text = "Make a quiz from the themes you selected. If you don't get a response from the bot, press the button again."
 
     buttons = [
         [
             InlineKeyboardButton(
-                text="Autogenerate", callback_data=str(AUTOGENERATING_THEMES)),
-            InlineKeyboardButton(
-                text="Manually Input", callback_data=str(MANUAL_THEME_ENTRY)),
+                text="Make Quiz", callback_data=str(QUIZ_MADE)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -191,12 +277,75 @@ async def selecting_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
 
-    return SELECTING_THEMES
+    return SELECTING_QUIZ
 
 
 async def making_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Make the quiz'''
-    return await start(update, context)
+
+    source = context.user_data.get(SOURCE)
+
+    prompt = "Bob is a chatbot that gives a multiple choice quiz based on a source text with 4 options labeled from 1 to 4 alongside an explanation for the correct answer in the following format: \n\n Question \n\n 1. option 1 \n 2. option 2 \n 3. option 3 \n 4. option 4 *  \n\n explanation: ... \n\n The correct answer is labeled with a * \n\n Question \n\n 1. option 1 \n 2. option 2 \n 3. option 3 \n 4. option 4 * \n\n explanation: The correct answer is option 4 because ... . The options are kept less than 100 characters. \n\n The source text is: \n\n"
+
+    prompt = "Bob is chatbot that gives a multiple choice quiz based on a source text. \n\n The correct answer is labeled with * after.\n An explanation is given for the correct answer.\n The options are kept less than 100 characters.\n\n The format of the quiz is: \n\n Question: \n\n 1. option 1 \n 2. option 2 \n 3. option 3 \n 4. option 4 * \n\n explanation: Option 4 is correct because ... . \n\n The source text is: \n\n"
+
+    prompt += source
+
+    themes = context.bot_data.get("themes", [])
+
+    if context.bot_data.get("user_themes"):
+        themes += context.bot_data.get("user_themes")
+
+    if themes is not None:
+        prompt += f'\n\n The themes that Bob should focus on when formulating the questions are: {random.choice(themes)} \n\n'
+
+    prompt += '\n\n Bob: \n\n'
+    response = get_response(prompt)
+
+    question = response.index("Question: ")
+    choice_1 = response.index("1. ")
+    choice_2 = response.index("2. ")
+    choice_3 = response.index("3. ")
+    choice_4 = response.index("4. ")
+    explanation = response.index("Explanation: ")
+
+    question = response[question + 10: choice_1 - 1]
+    choice_1 = response[choice_1 + 3: choice_2 - 1]
+    choice_2 = response[choice_2 + 3: choice_3 - 1]
+    choice_3 = response[choice_3 + 3: choice_4 - 1]
+    choice_4 = response[choice_4 + 3: explanation - 1]
+    explanation = response[explanation + 13:]
+
+    choices = [choice_1, choice_2, choice_3, choice_4]
+    for i in range(4):
+        choices[i] = choices[i][:100]
+
+    correct_answer = 0
+
+    for i in range(len(choices)):
+        if '*' in choices[i]:
+            correct_answer = i
+            choices[i] = choices[i].replace('*', '')
+
+    try:
+        message = await update.effective_message.reply_poll(
+
+            question, choices, type=Poll.QUIZ, correct_option_id=correct_answer, is_anonymous=False,
+            explanation=explanation
+        )
+    except ValueError:
+        await update.effective_message.reply_text('Please try again later.')
+
+    payload = {
+
+        message.poll.id: {"chat_id": update.effective_chat.id,
+                          "message_id": message.message_id}
+
+    }
+
+    context.bot_data.update(payload)
+
+    return END
 
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -236,14 +385,21 @@ def main() -> None:
                 CallbackQueryHandler(
                     auto_generating_themes, pattern="^" + str(AUTOGENERATING_THEMES) + "$"),
                 CallbackQueryHandler(
-                    manual_theme_entry, pattern="^" + str(MANUAL_THEME_ENTRY) + "$"),
+                    go_to_manual_theme_entry, pattern="^" + str(GOING_TO_MANUAL_THEMES) + "$"),
+                PollAnswerHandler(receive_poll_answer)
+            ],
+            MANUAL_THEME_ENTRY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND,
+                               manual_theme_entry)
             ],
             SELECTING_QUIZ: [
                 CallbackQueryHandler(
                     making_quiz, pattern="^" + str(QUIZ_MADE) + "$"),
+                CommandHandler("stop", stop)
             ]
         },
         fallbacks=[CommandHandler("stop", stop)],
+        per_chat=False,
     )
 
     application.add_handler(conv_handler)

@@ -10,16 +10,12 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 
-import nltk
-nltk.download('punkt')
 pd.set_option('display.max_colwidth', 100)
 
 
-#df = pd.read_csv(source, sep='.')  # add data here
+# df = pd.read_csv(source, sep='.')  # add data here
 
 stopwords.words('english')
-
-
 
 
 def clean_data(text: str, remove_stopwords: bool = True) -> str:
@@ -101,7 +97,6 @@ def get_top_words_per_cluster(df, vec, n_words, kmeans):
     return top_words
 
 
-
 def create_clusters(df, clusters: int = 5):
     """
     Creates clusters using the KMeans algorithm.
@@ -122,7 +117,6 @@ def create_clusters(df, clusters: int = 5):
     return df, top_words
 
 
-
 def text_to_df(text: str) -> pd.DataFrame:
     """
     Converts a string of text into a pandas DataFrame.
@@ -136,6 +130,7 @@ def text_to_df(text: str) -> pd.DataFrame:
     # make a dataframe with 0 as a column name, splitting text into rows of 5 words and corresponding punctuation each
     df = pd.DataFrame(text.split('.'), columns=[0])
     return df
+
 
 def unify_top_words(top_words):
     # create a list of all the top words, removing duplicates
@@ -162,6 +157,7 @@ def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
     top_words_list = unify_top_words(top_words)
     min_length = min(len(top_words_list), 10)
     return top_words_list[:min_length]
+
 
 text = """
 /source Principal Components Analysis (PCA) is a well-known unsupervised dimensionality reduction technique that constructs relevant features/variables through linear (linear PCA) or non-linear (kernel PCA) combinations of the original variables (features). In this post, we will only focus on the famous and widely used linear PCA method.
