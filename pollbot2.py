@@ -59,21 +59,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Top level conversation states
-SELECTING_ACTION, SELECTING_SOURCE, SELECTING_THEMES, MAKING_QUIZ, SELECTING_QUIZ = map(
-    chr, range(5))
+SELECTING_ACTION, SELECTING_SOURCE, DECIDING_NUMBER_OF_QUESTIONS, SELECTING_THEMES, MAKING_QUIZ, SELECTING_QUIZ = map(
+    chr, range(6))
 
 # Source selection conversation states
-SAVING_SOURCE = chr(5)
+SAVING_SOURCE = chr(6)
+
+# Number of questions conversation states
+SAVING_NUMBER_OF_QUESTIONS = chr(7)
 
 # Theme selection conversation states
 AUTOGENERATING_THEMES, SELECTING_THEMES_FROM_LIST, MANUAL_THEME_ENTRY = map(
-    chr, range(6, 9))
+    chr, range(8, 11))
 
 # Quiz generation conversation states
-QUIZ_MADE = chr(9)
+QUIZ_MADE = chr(12)
 
 # Meta states
-STOPPING, SHOWING = map(chr, range(10, 12))
+STOPPING, SHOWING = map(chr, range(12, 14))
 # Shortcut for ConversationHandler.END
 END = ConversationHandler.END
 
@@ -81,31 +84,36 @@ END = ConversationHandler.END
 (
     START_OVER,
     SOURCE,
+    NUMBER_OF_QUESTIONS,
     THEMES,
     QUIZ,
     GOING_TO_MANUAL_THEMES
-) = map(chr, range(12, 17))
+) = map(chr, range(14, 20))
 
 
 # Top level conversation callbacks
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     """Conversation hub for choosing between main features of the bot."""
     text = (
-        "You can add a source, select themes, or make a quiz. To abort, simply type /stop."
+        "You can add a text source to be quizzed on, select specific topics to be quizzed on, and use those to generate a quiz."
     )
 
     buttons = [
         [
             InlineKeyboardButton(
-                text="Source", callback_data=str(SELECTING_SOURCE)),
+                text="Add a text source", callback_data=str(SELECTING_SOURCE)),
         ],
         [
             InlineKeyboardButton(
-                text="Themes", callback_data=str(SELECTING_THEMES_FROM_LIST)),
+                text="Decide how many questions you want", callback_data=str(DECIDING_NUMBER_OF_QUESTIONS)),
         ],
         [
-            InlineKeyboardButton(text="Quiz", callback_data=str(MAKING_QUIZ)),
-            InlineKeyboardButton(text="Done", callback_data=str(END)),
+            InlineKeyboardButton(
+                text="Select topics in the source text", callback_data=str(SELECTING_THEMES_FROM_LIST)),
+        ],
+        [
+            InlineKeyboardButton(text="Make a quiz", callback_data=str(MAKING_QUIZ)),
+            InlineKeyboardButton(text="Finish", callback_data=str(END)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -131,7 +139,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
 
 async def selecting_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Give the user the option to either send a file or a text message'''
-    text = "Please send the source you want to add, You can either send a file or a text message. \n Supported types: only text atm"
+    text = "Please send the text source you want to be quizzed. \n As of now we support copy-pasted entries."
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(text=text)
@@ -154,17 +162,43 @@ async def saving_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> s
     return await start(update, context)
 
 
-async def selecting_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
-    '''Give the user the option to either auto generate themes or select from a list'''
+async def deciding_number_of_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+    '''Give the user the option to either send a file or a text message'''
+    text = "Please send the number of questions you want to be quizzed on."
 
-    text = "Type in the themes you want to study, separated by commas. \n Example: 'Python, Telegram, Bot'"
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(text=text)
+
+    return SAVING_NUMBER_OF_QUESTIONS
+
+
+async def saving_number_of_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+    '''Save the source to user_data'''
+
+    context.user_data['chat_id'] = update.message.chat_id
+    if update.message is not None:
+        number_of_questions = update.message.text
+    else:
+        number_of_questions = update.message.document.file_id
+    context.user_data[NUMBER_OF_QUESTIONS] = int(number_of_questions)
+    context.user_data[START_OVER] = True
+    await update.message.reply_text(f"Number of questions saved")
+    print(context.user_data)
+
+    return await start(update, context)
+
+
+async def selecting_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+    '''Give the user the option to either autogenerate themes or select from a list'''
+
+    text = "Choose the topics you would like to focus on. If you want a combination of bot-generated and self-selected topics, you can choose one option and return to this step again later.'"
 
     buttons = [
         [
             InlineKeyboardButton(
-                text="Autogenerate", callback_data=str(AUTOGENERATING_THEMES)),
+                text="Let the bot generate topics", callback_data=str(AUTOGENERATING_THEMES)),
             InlineKeyboardButton(
-                text="Manually Input", callback_data=str(GOING_TO_MANUAL_THEMES)),
+                text="Add topics yourself", callback_data=str(GOING_TO_MANUAL_THEMES)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -183,7 +217,7 @@ async def auto_generating_themes(update: Update, context: ContextTypes.DEFAULT_T
 
     message = await context.bot.send_poll(
         update.effective_chat.id,
-        "Select the themes you want to study",
+        "The bot thought these topics were important. Select the ones you think are relevant to you.",
         suggested_themes,
         is_anonymous=False,
         allows_multiple_answers=True
@@ -239,7 +273,7 @@ async def receive_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def go_to_manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Go to the manual theme entry state'''
 
-    text = "Type in the themes you want to study, separated by commas. \n Example: 'Python, Telegram, Bot'"
+    text = "Type in the topics you want to focus on, separated by commas. \n Example: 'Cytoplasm, Anaphase, DNA'"
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(text=text)
@@ -256,7 +290,7 @@ async def manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.bot_data['user_themes'] = user_themes_string.split(
         ',')
     context.user_data[START_OVER] = True
-    await context.bot.send_message(update.effective_chat.id, "Themes saved!")
+    await context.bot.send_message(update.effective_chat.id, "Topics saved!")
 
     return await start(update, context)
 
@@ -264,12 +298,12 @@ async def manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def selecting_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Select the quiz to be made'''
 
-    text = "Make a quiz from the themes you selected. If you don't get a response from the bot, press the button again."
+    text = "Click the button below to generate a quiz. If you don't get a response from the bot and the timer icon has disappeared, press the button again."
 
     buttons = [
         [
             InlineKeyboardButton(
-                text="Make Quiz", callback_data=str(QUIZ_MADE)),
+                text="Make a quiz", callback_data=str(QUIZ_MADE)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -296,7 +330,9 @@ async def making_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str
     if context.bot_data.get("user_themes"):
         themes += context.bot_data.get("user_themes")
 
-    if themes is not None:
+    if themes != []:
+        print(themes, 'AERGKAJNKADNLSKVNBSFNVB')
+        print(random.choice(themes))
         prompt += f'\n\n The themes that Bob should focus on when formulating the questions are: {random.choice(themes)} \n\n'
 
     prompt += '\n\n Bob: \n\n'
@@ -376,11 +412,18 @@ def main() -> None:
                     selecting_themes, pattern="^" + str(SELECTING_THEMES_FROM_LIST) + "$"),
                 CallbackQueryHandler(
                     selecting_quiz, pattern="^" + str(MAKING_QUIZ) + "$"),
+                CallbackQueryHandler(
+                    deciding_number_of_questions, pattern="^" + str(DECIDING_NUMBER_OF_QUESTIONS) + "$"
+                                    ),
                 CallbackQueryHandler(stop, pattern="^" + str(END) + "$"),
             ],
             SAVING_SOURCE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, saving_source),
             ],
+            SAVING_NUMBER_OF_QUESTIONS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, saving_number_of_questions),
+            ],
+
             SELECTING_THEMES: [
                 CallbackQueryHandler(
                     auto_generating_themes, pattern="^" + str(AUTOGENERATING_THEMES) + "$"),
@@ -394,9 +437,9 @@ def main() -> None:
             ],
             SELECTING_QUIZ: [
                 CallbackQueryHandler(
-                    making_quiz, pattern="^" + str(QUIZ_MADE) + "$"),
-                CommandHandler("stop", stop)
-            ]
+                    making_quiz, pattern="^" + str(QUIZ_MADE) + "$")
+            ],
+        
         },
         fallbacks=[CommandHandler("stop", stop)],
         per_chat=False,
