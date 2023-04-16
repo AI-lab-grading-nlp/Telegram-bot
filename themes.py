@@ -1,3 +1,7 @@
+from chatbot import get_response, get_cheaper_response
+from dotenv import load_dotenv, find_dotenv
+from io import StringIO
+import openai
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import string
@@ -142,21 +146,21 @@ def unify_top_words(top_words):
     return top_words_list
 
 
-def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
-    """
-    Creates clusters using the KMeans algorithm.
+# def themes_pipeline(text: str, clusters: int = 5) -> pd.DataFrame:
+#     """
+#     Creates clusters using the KMeans algorithm.
 
-    Args:
-        df (pd.DataFrame): A pandas DataFrame containing the text data.
+#     Args:
+#         df (pd.DataFrame): A pandas DataFrame containing the text data.
 
-    Returns:
-        top_words_list (list): A list of the top words for all clusters to be used in themes.
-    """
-    df = text_to_df(text)
-    df, top_words = create_clusters(df, clusters=clusters)
-    top_words_list = unify_top_words(top_words)
-    min_length = min(len(top_words_list), 10)
-    return top_words_list[:min_length]
+#     Returns:
+#         top_words_list (list): A list of the top words for all clusters to be used in themes.
+#     """
+#     df = text_to_df(text)
+#     df, top_words = create_clusters(df, clusters=clusters)
+#     top_words_list = unify_top_words(top_words)
+#     min_length = min(len(top_words_list), 10)
+#     return top_words_list[:min_length]
 
 
 text = """
@@ -168,3 +172,26 @@ The resulting projected data are essentially linear combinations of the original
 
 In summary, PCA is an orthogonal transformation of the data into a series of uncorrelated data living in the reduced PCA space such that the first component explains the most variance in the data with each subsequent component explaining less.
 """
+
+
+load_dotenv()
+
+
+def themes_pipeline(text: str, cheaper=True) -> list[str]:
+    '''
+    Placeholder for theme extraction that uses OpenAI's API to extract themes from a given text.
+    '''
+
+    if cheaper:
+        messages = [{'role': 'user', 'content': text}, {'role': 'system',
+                                                        'content': 'What are the themes of this text? separate each theme with a comma.'}]
+        response = get_cheaper_response(messages)
+
+    else:
+        pre = 'System: You are a helpful chatbot. \n\nUser:'
+        message = '\n\nProvide a list of themes for the given text, separate each theme with a comma.\n\nBot:'
+        response = get_response(pre + text + message)
+
+    themes = response.split(',')
+
+    return themes

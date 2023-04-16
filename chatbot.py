@@ -7,7 +7,6 @@ load_dotenv()
 
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.organization = os.getenv("OPENAI_ORG")
 
 
 def get_response(prompt: str) -> str:
@@ -22,3 +21,11 @@ def get_response(prompt: str) -> str:
     )
 
     return response.choices[0].text
+
+
+def get_cheaper_response(messages: list[str]) -> str:
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages,)
+
+    return response['choices'][0]['message']['content']

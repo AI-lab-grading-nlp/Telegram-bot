@@ -1,0 +1,9 @@
+This is called test-driven development, or tdd. The set of two conversion functions — to_roman(), and later from_roman() — can be written and tested as a unit, separate from any larger program that imports them. Python has a framework for unit testing, the appropriately-named unittest module.
+
+Unit testing is an important part of an overall testing-centric development strategy. If you write unit tests, it is important to write them early and to keep them updated as code and requirements change. Many people advocate writing tests before they write the code they’re testing, and that’s the style I’m going to demonstrate in this chapter. But unit tests are beneficial no matter when you write them.
+
+Before writing code, writing unit tests forces you to detail your requirements in a useful fashion.
+While writing code, unit tests keep you from over-coding. When all the test cases pass, the function is complete.
+When refactoring code, they can help prove that the new version behaves the same way as the old version.
+When maintaining code, having tests will help you cover your ass when someone comes screaming that your latest change broke their old code. (“But sir, all the unit tests passed when I checked it in...”)
+When writing code in a team, having a comprehensive test suite dramatically decreases the chances that your code will break someone else’s code, because you can run their unit tests first. (I’ve seen this sort of thing in code sprints. A team breaks up the assignment, everybody takes the specs for their task, writes unit tests for it, then shares their unit tests with the rest of the team. That way, nobody goes off too far into developing code that doesn’t play well with others.
