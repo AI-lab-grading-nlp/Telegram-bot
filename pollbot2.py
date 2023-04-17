@@ -14,6 +14,8 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import re
+import math
 import logging
 from typing import Any, Dict, Tuple
 
@@ -101,26 +103,26 @@ CURRENT_NUM_QUESTIONS = chr(20)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     """Conversation hub for choosing between main features of the bot."""
     text = (
-        "You can add a text source to be quizzed on, select specific topics to be quizzed on, and use those to generate a quiz."
+        "You can add a text source to be quizzed on, select specific topics to focus on, and use those to generate a quiz. \n If you want to stop at any point, type /stop."
     )
 
     buttons = [
         [
             InlineKeyboardButton(
-                text="Add a text source", callback_data=str(SELECTING_SOURCE)),
+                text="1. Add a text source", callback_data=str(SELECTING_SOURCE)),
         ],
         [
             InlineKeyboardButton(
-                text="Decide how many questions you want", callback_data=str(DECIDING_NUMBER_OF_QUESTIONS)),
+                text="2. Decide how many questions you want", callback_data=str(DECIDING_NUMBER_OF_QUESTIONS)),
         ],
         [
             InlineKeyboardButton(
-                text="Select topics in the source text", callback_data=str(SELECTING_THEMES_FROM_LIST)),
+                text="3. Select topics in the source text", callback_data=str(SELECTING_THEMES_FROM_LIST)),
         ],
         [
-            InlineKeyboardButton(text="Make a quiz",
+            InlineKeyboardButton(text="4. Make a quiz",
                                  callback_data=str(MAKING_QUIZ)),
-            InlineKeyboardButton(text="Finish", callback_data=str(END)),
+            InlineKeyboardButton(text="5. Finish", callback_data=str(END)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -150,7 +152,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
 
 async def selecting_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Give the user the option to either send a file or a text message'''
-    text = "Please send the text source you want to be quizzed. \n As of now we support copy-pasted entries."
+    text = "Please send the text source you want to be quizzed. \n As of now we support copy-pasted entries. \n If you just want to test out the bot, type 'debug' and we'll send you a random text from our database."
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(text=text)
@@ -181,7 +183,13 @@ async def saving_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> s
 
 async def deciding_number_of_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Give the user the option to either send a file or a text message'''
-    text = "Please send the number of questions you want to be quizzed on."
+    # get the number of words in the source text. words are separated by punctuation and spaces.
+    n_words = len(re.findall(r'\w+', context.user_data[SOURCE]))
+    rec_number_of_questions = math.floor(math.log(n_words/69)/0.4)
+    rec_number_of_questions = min(10, rec_number_of_questions)
+
+    text = f"Please send the number of questions you want to be quizzed on. \n Based on the length of this text, we suggest {rec_number_of_questions} questions."
+    context.user_data[CURRENT_NUM_QUESTIONS] = 0
 
     await update.callback_query.answer()
     await update.callback_query.edit_message_text(text=text)
@@ -197,7 +205,12 @@ async def saving_number_of_questions(update: Update, context: ContextTypes.DEFAU
         number_of_questions = update.message.text
     else:
         number_of_questions = update.message.document.file_id
-    context.user_data[NUMBER_OF_QUESTIONS] = int(number_of_questions)
+    try:
+        context.user_data[NUMBER_OF_QUESTIONS] = int(number_of_questions)
+    except:
+        # tell the user they messed up
+        await update.message.reply_text("Please try again. Make sure to send a number.")
+        return await start(update, context)
     context.user_data[START_OVER] = True
     await update.message.reply_text(f"Number of questions saved")
 
@@ -207,7 +220,7 @@ async def saving_number_of_questions(update: Update, context: ContextTypes.DEFAU
 async def selecting_themes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Give the user the option to either autogenerate themes or select from a list'''
 
-    text = "Choose the topics you would like to focus on. If you want a combination of bot-generated and self-selected topics, you can choose one option and return to this step again later.'"
+    text = "Choose the topics you would like to focus on. \n If you want a combination of bot-generated and self-selected topics, you can choose one option and return to this step again later.'"
 
     buttons = [
         [
@@ -233,7 +246,7 @@ async def auto_generating_themes(update: Update, context: ContextTypes.DEFAULT_T
 
     message = await context.bot.send_poll(
         update.effective_chat.id,
-        "The bot thought these topics were important. Select the ones you think are relevant to you.",
+        "The bot thought these topics were important. Select all that seem relevant to you.",
         suggested_themes,
         is_anonymous=False,
         allows_multiple_answers=True
@@ -314,7 +327,7 @@ async def manual_theme_entry(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def selecting_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Select the quiz to be made'''
 
-    text = "Click the button below to generate a quiz. If you don't get a response from the bot and the timer icon has disappeared, press the button again."
+    text = "Click the button below to generate a quiz. If you don't get a response from the bot and the clock icon has disappeared, press the button again."
 
     buttons = [
         [
