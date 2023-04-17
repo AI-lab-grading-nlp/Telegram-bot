@@ -1,0 +1,7 @@
+pandas
+tensorflow
+tensorflow_hub
+keras
+numpy
+matplotlib
+nltk
