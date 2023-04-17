@@ -97,9 +97,14 @@ END = ConversationHandler.END
 CURRENT_NUM_QUESTIONS = chr(20)
 
 
+
+
 # Top level conversation callbacks
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     """Conversation hub for choosing between main features of the bot."""
+    
+
+
     text = (
         "You can add a text source to be quizzed on, select specific topics to focus on, and use those to generate a quiz. \n If you want to stop at any point, type /stop."
     )
@@ -119,7 +124,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
         ],
         [
             InlineKeyboardButton(text="4. Make a quiz",
-                                 callback_data=str(MAKING_QUIZ)),
+                                callback_data=str(MAKING_QUIZ)),
             InlineKeyboardButton(text="5. Finish", callback_data=str(END)),
         ]
     ]
@@ -341,6 +346,7 @@ async def selecting_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     return SELECTING_QUIZ
 
+from telegram.constants import ChatAction
 
 async def making_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Make the quiz'''
@@ -363,6 +369,7 @@ async def making_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str
 
     try:
         response = get_response(prompt)
+        print
     except:
         return await making_quiz(update, context)
 
@@ -395,11 +402,14 @@ async def making_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str
             choices[i] = choices[i].replace('*', '')
 
     try:
+
         message = await update.effective_message.reply_poll(
 
             question, choices, type=Poll.QUIZ, correct_option_id=correct_answer, is_anonymous=False,
             explanation=explanation
         )
+
+
     except ValueError:
         await update.effective_message.reply_text('Please try again later.')
 

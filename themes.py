@@ -176,6 +176,15 @@ In summary, PCA is an orthogonal transformation of the data into a series of unc
 
 load_dotenv()
 
+def clean_themes(themes: list[str]) -> list[str]:
+
+    new_themes = []
+    for t in themes:
+        t = clean_data(t, remove_stopwords=True)
+        new_themes.append(t)
+
+    return new_themes
+
 
 def themes_pipeline(text: str, cheaper=True) -> list[str]:
     '''
@@ -193,5 +202,10 @@ def themes_pipeline(text: str, cheaper=True) -> list[str]:
         response = get_response(pre + text + message)
 
     themes = response.split(',')
+
+    print('old themes', themes)
+    # clean themes
+    themes = clean_themes(themes)
+    print('new themes', themes)
 
     return themes
