@@ -14,6 +14,8 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import re
+import math
 import logging
 from typing import Any, Dict, Tuple
 
@@ -149,6 +151,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
             await update.callback_query.edit_message_text(
                 text=text, reply_markup=keyboard)
     context.user_data[START_OVER] = False
+    context.user_data[CURRENT_NUM_QUESTIONS] = 0
     return SELECTING_ACTION
 
 
@@ -182,8 +185,6 @@ async def saving_source(update: Update, context: ContextTypes.DEFAULT_TYPE) -> s
     await update.message.reply_text(f"Source saved")
     return await start(update, context)
 
-import math
-import re
 
 async def deciding_number_of_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     '''Give the user the option to either send a file or a text message'''
